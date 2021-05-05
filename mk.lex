@@ -1,25 +1,25 @@
 %{
 #include "mk.tab.h"
 
-extern unsigned int line;
+extern unsigned int g_line_amt;
 extern int yyerror(const char *);
 unsigned int cont = 0;
-extern char* file;
+extern char* g_name_of_file;
 static void update_line();
 static void handle_function();
 %}
 
 NUM [0-9]
-NAME [_a-zA-Z\-\+\@\\]
-CMD_RUN ^(\@[^\@]*\@)?\t\.\/[^\n]*          
+UNIT_NAME [_a-zA-Z\-\+\@\\]
+RUN_CMD ^(\@[^\@]*\@)?\t\.\/[^\n]*          
 CMD_S ^(\@[^\@]*\@)?\t[^\n]*
 %%
 
 
-{CMD_RUN}       { return CMD_RUN;}
-{CMD_S}         { return CMD;}
-{CMD_RUN}(\\\n[ \t]*[^\n]*)*     { update_line(); return CMD_RUN;}
-{CMD_S}(\\\n[ \t]*[^\n]*)*       { update_line(); return CMD;}
+{RUN_CMD}                        { return RUN_CMD;}
+{CMD_S}                          { return COMMAND;}
+{RUN_CMD}(\\\n[ \t]*[^\n]*)*     { update_line(); return RUN_CMD;}
+{CMD_S}(\\\n[ \t]*[^\n]*)*       { update_line(); return COMMAND;}
 
 "#"[^\n]*   {}
 
@@ -45,8 +45,8 @@ CMD_S ^(\@[^\@]*\@)?\t[^\n]*
 "}"         { return '}'; }
 "`"         { return '`'; }
 \'          { return '\''; }
-\n          { ++line; cont = 0; return EOL;}
-[ \t]+\n    { ++line; cont = 0; return EOL;}
+\n          { ++g_line_amt; cont = 0; return EOL;}
+[ \t]+\n    { ++g_line_amt; cont = 0; return EOL;}
 "@"         {  }
 "ifeq"      { return IFEQ;}
 "ifneq"     { return IFNEQ;}
@@ -91,10 +91,10 @@ $\("value"      { handle_function();return FUNCTION;}
 $\("eval"       { handle_function();return FUNCTION;}
 $\("origin"     { handle_function();return FUNCTION;}
 $\("flavour"    { handle_function();return FUNCTION;}
-$\("error"      { handle_function();return ERROR_FUNCTION;}
+$\("error"      { handle_function();return ERROR;}
 
-^"%"({NAME}|{NUM}|[\.]|[//])*                              { return PATTERN_TARGET;}
-^"."({NAME}|{NUM})*"."({NAME}|{NUM})+                  { return SFX_TARGET;}
+^"%"({UNIT_NAME}|{NUM}|[\.]|[//])*                              { return TEMPLATE_TRGT;}
+^"."({UNIT_NAME}|{NUM})*"."({UNIT_NAME}|{NUM})+                  { return SFX_TARGET;}
 
 
 \"[^\"]*\"                        { yylval.string = strdup(yytext); return STRING; }
@@ -102,22 +102,22 @@ $\("error"      { handle_function();return ERROR_FUNCTION;}
 \`[^\`]*\`                        { return SHELL; }
 $\(shell[^\)]*\)                  { return SHELL; }
 
-"::="|"="                         { return VAR_DEF; }
-[":"|"!"|"?"|"+"]"="              { return VAR_DEF; }
+"::="|"="                         { return VAR_DEFINITION; }
+[":"|"!"|"?"|"+"]"="              { return VAR_DEFINITION; }
 
-$("@"|"%"|"<"|"?"|"^"|"+"|"*")    { yylval.string = strdup(yytext);return AUTO_VAR; }
-
-
-
-\%({NAME}|{NUM}|[\.])*         { return PATTERN;}
-
-\\[\r]?\n[ \t]*  { ++line;}
-
-({NAME}|{NUM})+                  { yylval.string = strdup(yytext); return NAME; }
+$("@"|"%"|"<"|"?"|"^"|"+"|"*")    { yylval.string = strdup(yytext);return VAR_AUT; }
 
 
-({NAME}|{NUM}|[\.])+                 { yylval.string = strdup(yytext); return FILENAME; }
-(\/|[\.\.]|[\.])?(({NAME}|{NUM}|[\.]|[\.\.])+[\/]?)+([\/]|[\/\*])?  { yylval.string = strdup(yytext); return PATH; }
+
+\%({UNIT_NAME}|{NUM}|[\.])*            { return TEMPLATE;}
+
+\\[\r]?\n[ \t]*  { ++g_line_amt;}
+
+({UNIT_NAME}|{NUM})+                   { yylval.string = strdup(yytext); return UNIT_NAME; }
+
+
+({UNIT_NAME}|{NUM}|[\.])+                 { yylval.string = strdup(yytext); return NAME_OF_FILE; }
+(\/|[\.\.]|[\.])?(({UNIT_NAME}|{NUM}|[\.]|[\.\.])+[\/]?)+([\/]|[\/\*])?  { yylval.string = strdup(yytext); return PATH; }
 
 [ \t\f\v\r]
 .          { printf("0x%x ",yytext[0]);yyerror("!syntax error"); exit(0); }
@@ -151,7 +151,7 @@ static void handle_function()
             {
                 if (prev == '\\')
                 {
-                    ++line;
+                    ++g_line_amt;
                     break;
                 }
                 else
@@ -165,17 +165,18 @@ static void handle_function()
     }
 }
 
+
 static void update_line()
 {
     char str[256];
     memset(str,0,256);
-    snprintf(str,256,"sed -n \'%u,$ p\' %s | grep \'[^\\\\$]*[^\\\\]$\' -m1 -n | cut -d : -f 1",line,file);
+    snprintf(str,256,"sed -n \'%u,$ p\' %s | grep \'[^\\\\$]*[^\\\\]$\' -m1 -n | cut -d : -f 1", g_line_amt, g_name_of_file);
     FILE *f = popen(str, "r");
     if (!feof(f)) {
          if(fgets(str,256,f) != NULL)
          {
-            line += atoi(str);
-            --line;
+            g_line_amt += atoi(str);
+            --g_line_amt;
          }
     }
     pclose(f);
