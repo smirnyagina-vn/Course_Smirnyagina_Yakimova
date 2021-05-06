@@ -16,9 +16,9 @@ CMD_S ^(\@[^\@]*\@)?\t[^\n]*
 %%
 
 
-{RUN_CMD}                        { return RUN_CMD;}
+{RUN_CMD}                        { return RUN_COMMAND;}
 {CMD_S}                          { return COMMAND;}
-{RUN_CMD}(\\\n[ \t]*[^\n]*)*     { update_line(); return RUN_CMD;}
+{RUN_CMD}(\\\n[ \t]*[^\n]*)*     { update_line(); return RUN_COMMAND;}
 {CMD_S}(\\\n[ \t]*[^\n]*)*       { update_line(); return COMMAND;}
 
 "#"[^\n]*   {}
@@ -94,18 +94,18 @@ $\("flavour"    { handle_function();return FUNCTION;}
 $\("error"      { handle_function();return ERROR;}
 
 ^"%"({UNIT_NAME}|{DIGIT}|[\.]|[//])*                              { return TEMPLATE_TRGT;}
-^"."({UNIT_NAME}|{DIGIT})*"."({UNIT_NAME}|{DIGIT})+                  { return SFX_TARGET;}
+^"."({UNIT_NAME}|{DIGIT})*"."({UNIT_NAME}|{DIGIT})+                  { return SFX_TRGT;}
 
 
-\"[^\"]*\"                        { yylval.string = strdup(yytext); return STRING; }
-\'[^\']*\'                        { yylval.string = strdup(yytext); return STRING; }
-\`[^\`]*\`                        { return SHELL; }
-$\(shell[^\)]*\)                  { return SHELL; }
+\"[^\"]*\"                        { yylval.str = strdup(yytext); return CHARS; }
+\'[^\']*\'                        { yylval.str = strdup(yytext); return CHARS; }
+\`[^\`]*\`                        { return SHELL_COMMAND; }
+$\(shell[^\)]*\)                  { return SHELL_COMMAND; }
 
 "::="|"="                         { return VAR_DEFINITION; }
 [":"|"!"|"?"|"+"]"="              { return VAR_DEFINITION; }
 
-$("@"|"%"|"<"|"?"|"^"|"+"|"*")    { yylval.string = strdup(yytext);return VAR_AUT; }
+$("@"|"%"|"<"|"?"|"^"|"+"|"*")    { yylval.str = strdup(yytext);return VAR_AUT; }
 
 
 
@@ -113,11 +113,11 @@ $("@"|"%"|"<"|"?"|"^"|"+"|"*")    { yylval.string = strdup(yytext);return VAR_AU
 
 \\[\r]?\n[ \t]*  { ++g_line_amt;}
 
-({UNIT_NAME}|{DIGIT})+                   { yylval.string = strdup(yytext); return UNIT_NAME; }
+({UNIT_NAME}|{DIGIT})+                   { yylval.str = strdup(yytext); return UNIT_NAME; }
 
 
-({UNIT_NAME}|{DIGIT}|[\.])+                 { yylval.string = strdup(yytext); return NAME_OF_FILE; }
-(\/|[\.\.]|[\.])?(({UNIT_NAME}|{DIGIT}|[\.]|[\.\.])+[\/]?)+([\/]|[\/\*])?  { yylval.string = strdup(yytext); return PATH; }
+({UNIT_NAME}|{DIGIT}|[\.])+                 { yylval.str = strdup(yytext); return NAME_OF_FILE; }
+(\/|[\.\.]|[\.])?(({UNIT_NAME}|{DIGIT}|[\.]|[\.\.])+[\/]?)+([\/]|[\/\*])?  { yylval.str = strdup(yytext); return PATH; }
 
 [ \t\f\v\r]
 .          { printf("0x%x ",yytext[0]);yyerror("!syntax error"); exit(0); }

@@ -3,66 +3,70 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define TRUE 1
+#define FALSE 0
+
 extern FILE *yyin;
 extern FILE *yyout;
 
 int yyparse();
 int yyerror(const char *s);
 
+char *g_name_of_file;
+
 extern int yylex();
 
-unsigned int g_line_amt = 1;
-unsigned int g_cond_amt = 0;            //to count the number of conditional structures
+unsigned int g_line_amt = 1;            
+unsigned int g_cond_amt = 0;            //для подсчёта вложенных условных конструкций
+unsigned int g_if_in_trgt = FALSE;   
 unsigned int g_if_trgt_created = 0;
 
 
-char *g_name_of_file;
-  
-enum STATE_IN_TARG
-{
-	NORMAL,
-    TARGET
-};
+inline static void CheckCurState();
 
-inline static void check_state();
-static enum STATE_IN_TARG targState = NORMAL;
-inline static void switch_state(enum STATE_IN_TARG to);
+void ToggleCurState(unsigned int new_state) { g_if_in_trgt = new_state;}
+
+void ErrorMsg(const char* error_type, const char* error_cause, int line_number);
 
 %}
 %define parse.error verbose
 
 %union 
 {
-        int number;
-        char *string;
+        char *str;
+        int digit;
 }
 
-%token <string> PATH
-%token <string> STRING
-%token <string> VAR_AUT
-%token <string> UNIT_NAME
-%token <string> NAME_OF_FILE
-%token VAR_DEFINITION TEMPLATE TEMPLATE_TRGT SFX_TARGET COMMAND RUN_CMD CMD_CONT SHELL
 
+%token COMMAND RUN_COMMAND CONT_COMMAND SHELL_COMMAND
+%token VAR_DEFINITION TEMPLATE TEMPLATE_TRGT SFX_TRGT 
+
+%token EOL
 %token SPECIAL
-%token EOFILE EOL
-%token IFEQ IFNEQ IFDEF IFNDEF ELSE ENDIF
-%token INCLUDE DEFINE EXPORT ENDEF ERROR FUNCTION
+%token IFNEQ IFEQ 
+%token ELSE IFDEF IFNDEF ENDEF ENDIF
+%token INCLUDE DEFINE EXPORT ERROR FUNCTION
+
+%token <str> PATH
+%token <str> CHARS
+%token <str> VAR_AUT
+%token <str> UNIT_NAME
+%token <str> NAME_OF_FILE
 
 %start input
 
 %%
 input: line
-    | input line    //стартовая строка
+    | input line                    //стартовая строка
     ;
 
 line: EOL                          { }
-    | ident EOL                    { printf("\nLine %u: alone ident error",g_line_amt-1);}
-    | STRING EOL                   { printf("\nLine %u: alone ident error",g_line_amt-1);}
-    | SHELL EOL                    { printf("\nLine %u: alone ident error",g_line_amt-1);}
-    | variable                     { switch_state(NORMAL);}              
-    | target                       { if(g_if_trgt_created == 0) ++g_if_trgt_created;switch_state(TARGET);}
-    | command_seq                  { check_state();}
+    | unit EOL                     { ErrorMsg("alone unit","", g_line_amt-1);}
+    | CHARS EOL                   { ErrorMsg("alone unit","", g_line_amt-1);}
+    | SHELL_COMMAND EOL                    { ErrorMsg("alone unit","", g_line_amt-1);}
+    | variable                     { ToggleCurState(FALSE);}              
+    | target                       { if(g_if_trgt_created == 0) ++g_if_trgt_created; ToggleCurState(TRUE);}
+    | command_seq                  { CheckCurState();}
     | condition                    { }
     | include                       //включение нового make-файла
     | define                        //именованная командная последовательность
@@ -77,13 +81,13 @@ variable: var_name VAR_DEFINITION EOL               //объявление пе�
     ;
 
 var_name: UNIT_NAME                 { }
-    | VAR_AUT                      { printf("\nLine %u: auto var \"%s\" error",g_line_amt,$1);}
-    | PATH	                       { printf("\nLine %u: path var \"%s\" error",g_line_amt,$1);}
-    | NAME_OF_FILE                 { printf("\nLine %u: filename var \"%s\" error",g_line_amt,$1);}
+    | VAR_AUT                      { ErrorMsg("auto var",(const char*)$1, g_line_amt);}
+    | PATH	                       { ErrorMsg("path var",(const char*)$1, g_line_amt);}
+    | NAME_OF_FILE                 { ErrorMsg("filename var",(const char*)$1, g_line_amt);}
     ;
 
 variable_units: UNIT_NAME           //может быть как один объект, так и лист объектов
-    | STRING
+    | CHARS
     | PATH
     | NAME_OF_FILE
     |'(' variable_units ')'
@@ -91,7 +95,7 @@ variable_units: UNIT_NAME           //может быть как один объ
     | variable_unit
     | variable_units variable_unit
     | variable_units UNIT_NAME
-    | variable_units STRING
+    | variable_units CHARS
     | variable_units PATH
     | variable_units NAME_OF_FILE
     | variable_units '(' variable_units ')'
@@ -100,10 +104,10 @@ variable_units: UNIT_NAME           //может быть как один объ
     
 variable_unit: VAR_DEFINITION
     | FUNCTION
-    | SHELL
+    | SHELL_COMMAND
     | variable_unit_spec  
     | var_value
-    | VAR_AUT        { printf("\nLine %u: auto var \"%s\" error",g_line_amt,$1);}
+    | VAR_AUT                       { ErrorMsg("auto var",(const char*)$1, g_line_amt);}
     ;
 
 variable_unit_spec: ':'
@@ -120,28 +124,28 @@ variable_unit_spec: ':'
     ;
 
 //ссылка на переменную
-var_value: '$' UNIT_NAME                             { }       
-    | '$' '$' UNIT_NAME                              { }
-    | '$' PATH                                      { printf("\nLine %u: path var \"%s\" error",g_line_amt,$2);}
-    | '$' '$' PATH                                  { printf("\nLine %u: path var \"%s\" error",g_line_amt,$3);}
-    | '$' NAME_OF_FILE                              { printf("\nLine %u: filename var \"%s\" error",g_line_amt,$2);}
-    | '$' '$' NAME_OF_FILE                          { printf("\nLine %u: filename var \"%s\" error",g_line_amt,$3); }
-    | '$' STRING                                    { printf("\nLine %u: string var \"%s\" error",g_line_amt,$2); }
-    | '$' '$' STRING                                { printf("\nLine %u: string var \"%s\" error",g_line_amt,$3);}
-    | '$' '(' UNIT_NAME  ')'                         { }
-    | '$' '{' UNIT_NAME  '}'                         {  }
-    | '$' '(' PATH ')'                              { printf("\nLine %u: path var \"%s\" error",g_line_amt,$3); }
-    | '$' '{' PATH '}'                              { printf("\nLine %u: path var \"%s\" error",g_line_amt,$3);}
-    | '$' '(' NAME_OF_FILE ')'                      { printf("\nLine %u: filename var \"%s\" error",g_line_amt,$3); }
-    | '$' '{' NAME_OF_FILE '}'                      { printf("\nLine %u: filename var \"%s\" error",g_line_amt,$3); }
-    | '$' '(' STRING ')'                            { printf("\nLine %u: string var \"%s\" error",g_line_amt,$3); }
-    | '$' '{' STRING '}'                            { printf("\nLine %u: string var \"%s\" error",g_line_amt,$3);}
+var_value: '$' UNIT_NAME                            { }       
+    | '$' '$' UNIT_NAME                             { }
+    | '$' PATH                                      { ErrorMsg("path var",(const char*)$2, g_line_amt);     }
+    | '$' '$' PATH                                  { ErrorMsg("path var",(const char*)$3, g_line_amt);     }
+    | '$' NAME_OF_FILE                              { ErrorMsg("filename var",(const char*)$2, g_line_amt); }
+    | '$' '$' NAME_OF_FILE                          { ErrorMsg("filename var",(const char*)$3, g_line_amt); }
+    | '$' CHARS                                    { ErrorMsg("string var",(const char*)$2, g_line_amt);   }
+    | '$' '$' CHARS                                { ErrorMsg("string var",(const char*)$3, g_line_amt);   }
+    | '$' '(' UNIT_NAME  ')'                        { }
+    | '$' '{' UNIT_NAME  '}'                        { }
+    | '$' '(' PATH ')'                              { ErrorMsg("path var",(const char*)$3, g_line_amt);     }
+    | '$' '{' PATH '}'                              { ErrorMsg("path var",(const char*)$3, g_line_amt);     }
+    | '$' '(' NAME_OF_FILE ')'                      { ErrorMsg("filename var",(const char*)$3, g_line_amt); }
+    | '$' '{' NAME_OF_FILE '}'                      { ErrorMsg("filename var",(const char*)$3, g_line_amt); }
+    | '$' '(' CHARS ')'                            { ErrorMsg("string var",(const char*)$3, g_line_amt);   }
+    | '$' '{' CHARS '}'                            { ErrorMsg("string var",(const char*)$3, g_line_amt);   }
     | '$' '(' variable_unit ')'
     | '$' '{' variable_unit '}'
-    | '$' '$' '(' variable_units ')'                //переменные записываются в скрипте как `$(foo)' или `${foo}'
+    | '$' '$' '(' variable_units ')'                               //переменные записываются в скрипте как `$(foo)' или `${foo}'
     | '$' '$' '{' variable_units '}'
-    | '$' '(' UNIT_NAME  ':' subst VAR_DEFINITION subst ')' {  }
-    | '$' '{' UNIT_NAME  ':' subst VAR_DEFINITION subst '}' {  }
+    | '$' '(' UNIT_NAME  ':' subst VAR_DEFINITION subst ')'         {  }
+    | '$' '{' UNIT_NAME  ':' subst VAR_DEFINITION subst '}'         {  }
     | '$' '(' variable_unit  ':' subst VAR_DEFINITION subst ')'
     | '$' '{' variable_unit  ':' subst VAR_DEFINITION subst '}'
     ;
@@ -169,13 +173,13 @@ var_value: '$' UNIT_NAME                             { }
 
 
 target: target_spec prerequisite EOL       
-    | target_spec prerequisite ';' idents EOL
+    | target_spec prerequisite ';' units EOL
     | target_spec prerequisite ';' EOL
     ;
 
 target_spec: target_names ':'
     | target_names ':'':'
-    | SFX_TARGET ':'
+    | SFX_TRGT ':'
     | SPECIAL ':'
     ;
 
@@ -188,7 +192,7 @@ target_name: UNIT_NAME  { }
     | NAME_OF_FILE
     | TEMPLATE_TRGT
     | template
-    | VAR_AUT  { printf("\nLine %u: auto var \"%s\" error",g_line_amt,$1);}
+    | VAR_AUT  { ErrorMsg("auto var",(const char*)$1, g_line_amt);}
     | var_value
     ;
 
@@ -208,7 +212,7 @@ prerequisite_ident: UNIT_NAME {}
     | NAME_OF_FILE
     | FUNCTION
     | template
-    | VAR_AUT   { printf("\nLine %u: auto var \"%s\" error",g_line_amt,$1);}
+    | VAR_AUT   { ErrorMsg("auto var", (const char*)$1, g_line_amt);}
     | var_value
     ;
 
@@ -220,16 +224,16 @@ template: TEMPLATE
 //правило для команд, которые будут передаваться в bash
 
 command_seq: cmd EOL     
-    | cmd idents EOL
+    | cmd units EOL
     | cmd_cont EOL
     ;
 
-cmd_cont: CMD_CONT
-    | cmd_cont CMD_CONT
+cmd_cont: CONT_COMMAND
+    | cmd_cont CONT_COMMAND
     | cmd_cont cmd
     ;
 cmd: COMMAND
-    | RUN_CMD
+    | RUN_COMMAND
     ;
 
 
@@ -261,8 +265,8 @@ condition: if '(' cond ',' cond ')' EOL
     | if '(' ',' cond ')' EOL
     | if '(' cond ',' ')' EOL
     | if '(' ',' ')' EOL
-    | if STRING STRING EOL   
-    | ifdef ident EOL 
+    | if CHARS CHARS EOL   
+    | ifdef unit EOL 
     | ELSE		     { if(!g_cond_amt) yyerror("else without ifeq/ifdef statement");}
     | ENDIF          { if(!g_cond_amt) yyerror("endif without ifeq/ifdef statement"); else --g_cond_amt;}
     ;
@@ -276,8 +280,8 @@ ifdef: IFDEF { ++g_cond_amt; }
     | IFNDEF { ++g_cond_amt; }
     ;
 
-cond: ident
-    | STRING
+cond: unit
+    | CHARS
     | FUNCTION
     ;
 
@@ -295,8 +299,8 @@ def_cmd: def_cmd_spec
     | UNIT_NAME
     | PATH
     | NAME_OF_FILE
-    | STRING
-    | SHELL
+    | CHARS
+    | SHELL_COMMAND
     | VAR_DEFINITION
     | FUNCTION
     | var_value
@@ -330,36 +334,45 @@ filenames: UNIT_NAME
     | var_value
     ;
 
-idents: ident
-    | idents ident
+units: unit
+    | units unit
     ;
 
-ident: UNIT_NAME
+unit: UNIT_NAME
     | PATH
     | NAME_OF_FILE
     | VAR_AUT
     | var_value
     ;
 
-
 %%
 
 
-inline void switch_state(enum STATE_IN_TARG to)
+inline void CheckCurState()
 {
-    targState = to;
+    if(g_if_in_trgt == FALSE)
+      ErrorMsg("unmatched command sequence", "", g_line_amt-1);
 }
 
-inline void check_state()
+
+void ErrorMsg(const char* error_type, const char* error_cause, int line_number)
 {
-    if(targState == NORMAL)
-      printf("\nLine %u: unmatched command_seq",g_line_amt-1);
+    printf("\nLine %u: ", line_number);
+    printf("\033[35mwarning");
+    printf("\033[0m: %s ", error_type);
+    if (strcmp(error_cause, "") > 0)
+
+        printf("\033[35m%s\033[0m", error_cause);
 }
+
 
 int yyerror(const char *s)
-{
-  fprintf(stderr, "error: %s line %u\n", s, g_line_amt);
-  exit(0);
+{  
+    fprintf(stderr, "\nLine %u: ", g_line_amt);
+    fprintf(stderr, "\033[31merror");
+    fprintf(stderr, "\033[0m: %s", s);
+    fprintf(stderr, "\nProgram finished analysis\n");
+    exit(0);
 }
 
 
@@ -375,10 +388,7 @@ int main(int argc, char **argv)
   }
 
   g_name_of_file = argv[1];
-
   yyparse();
-
   printf("\nProgram finished analysis\n");
-
   return 0;
 }
