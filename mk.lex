@@ -9,7 +9,7 @@ static void update_line();
 static void handle_function();
 %}
 
-NUM [0-9]
+DIGIT [0-9]
 UNIT_NAME [_a-zA-Z\-\+\@\\]
 RUN_CMD ^(\@[^\@]*\@)?\t\.\/[^\n]*          
 CMD_S ^(\@[^\@]*\@)?\t[^\n]*
@@ -30,32 +30,32 @@ CMD_S ^(\@[^\@]*\@)?\t[^\n]*
 ";"         { return ';'; }
 "-"         { return '-'; }
 "+"         { return '+'; }
-"$"         { return '$'; }
 "\""        { return '"'; }
 "|"         { return '|'; }
 "/"         { return '/'; }
 "&"         { return '&'; }
+"$"         { return '$'; }
 "]"         { return ']'; }
 "["         { return '['; }
 "("         { return '('; }
 ")"         { return ')'; }
-"<"         { return '<'; }
-">"         { return '>'; }
 "{"         { return '{'; }
 "}"         { return '}'; }
+"<"         { return '<'; }
+">"         { return '>'; }
 "`"         { return '`'; }
 \'          { return '\''; }
 \n          { ++g_line_amt; cont = 0; return EOL;}
 [ \t]+\n    { ++g_line_amt; cont = 0; return EOL;}
 "@"         {  }
+"else"      { return ELSE;}
+^"endef"    { return ENDEF;}
 "ifeq"      { return IFEQ;}
+"endif"     { return ENDIF;}
 "ifneq"     { return IFNEQ;}
 "ifdef"     { return IFDEF;}
 "ifndef"    { return IFNDEF;}
-"else"      { return ELSE;}
-"endif"     { return ENDIF;}
 ^"define"   { return DEFINE;}
-^"endef"    { return ENDEF;}
 ^"export"   { return EXPORT;}
 ^"include"  { return INCLUDE;}
 <<EOF>>     { static int once = 0; return once++ ? 0 : EOL;}
@@ -93,8 +93,8 @@ $\("origin"     { handle_function();return FUNCTION;}
 $\("flavour"    { handle_function();return FUNCTION;}
 $\("error"      { handle_function();return ERROR;}
 
-^"%"({UNIT_NAME}|{NUM}|[\.]|[//])*                              { return TEMPLATE_TRGT;}
-^"."({UNIT_NAME}|{NUM})*"."({UNIT_NAME}|{NUM})+                  { return SFX_TARGET;}
+^"%"({UNIT_NAME}|{DIGIT}|[\.]|[//])*                              { return TEMPLATE_TRGT;}
+^"."({UNIT_NAME}|{DIGIT})*"."({UNIT_NAME}|{DIGIT})+                  { return SFX_TARGET;}
 
 
 \"[^\"]*\"                        { yylval.string = strdup(yytext); return STRING; }
@@ -109,15 +109,15 @@ $("@"|"%"|"<"|"?"|"^"|"+"|"*")    { yylval.string = strdup(yytext);return VAR_AU
 
 
 
-\%({UNIT_NAME}|{NUM}|[\.])*            { return TEMPLATE;}
+\%({UNIT_NAME}|{DIGIT}|[\.])*            { return TEMPLATE;}
 
 \\[\r]?\n[ \t]*  { ++g_line_amt;}
 
-({UNIT_NAME}|{NUM})+                   { yylval.string = strdup(yytext); return UNIT_NAME; }
+({UNIT_NAME}|{DIGIT})+                   { yylval.string = strdup(yytext); return UNIT_NAME; }
 
 
-({UNIT_NAME}|{NUM}|[\.])+                 { yylval.string = strdup(yytext); return NAME_OF_FILE; }
-(\/|[\.\.]|[\.])?(({UNIT_NAME}|{NUM}|[\.]|[\.\.])+[\/]?)+([\/]|[\/\*])?  { yylval.string = strdup(yytext); return PATH; }
+({UNIT_NAME}|{DIGIT}|[\.])+                 { yylval.string = strdup(yytext); return NAME_OF_FILE; }
+(\/|[\.\.]|[\.])?(({UNIT_NAME}|{DIGIT}|[\.]|[\.\.])+[\/]?)+([\/]|[\/\*])?  { yylval.string = strdup(yytext); return PATH; }
 
 [ \t\f\v\r]
 .          { printf("0x%x ",yytext[0]);yyerror("!syntax error"); exit(0); }
