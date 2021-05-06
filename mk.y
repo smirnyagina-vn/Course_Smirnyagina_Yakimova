@@ -62,8 +62,8 @@ input: line
 
 line: EOL                          { }
     | unit EOL                     { ErrorMsg("alone unit","", g_line_amt-1);}
-    | CHARS EOL                   { ErrorMsg("alone unit","", g_line_amt-1);}
-    | SHELL_COMMAND EOL                    { ErrorMsg("alone unit","", g_line_amt-1);}
+    | CHARS EOL                    { ErrorMsg("alone unit","", g_line_amt-1);}
+    | SHELL_COMMAND EOL            { ErrorMsg("alone unit","", g_line_amt-1);}
     | variable                     { ToggleCurState(FALSE);}              
     | target                       { if(g_if_trgt_created == 0) ++g_if_trgt_created; ToggleCurState(TRUE);}
     | command_seq                  { CheckCurState();}
@@ -130,16 +130,16 @@ var_value: '$' UNIT_NAME                            { }
     | '$' '$' PATH                                  { ErrorMsg("path var",(const char*)$3, g_line_amt);     }
     | '$' NAME_OF_FILE                              { ErrorMsg("filename var",(const char*)$2, g_line_amt); }
     | '$' '$' NAME_OF_FILE                          { ErrorMsg("filename var",(const char*)$3, g_line_amt); }
-    | '$' CHARS                                    { ErrorMsg("string var",(const char*)$2, g_line_amt);   }
-    | '$' '$' CHARS                                { ErrorMsg("string var",(const char*)$3, g_line_amt);   }
+    | '$' CHARS                                     { ErrorMsg("string var",(const char*)$2, g_line_amt);   }
+    | '$' '$' CHARS                                 { ErrorMsg("string var",(const char*)$3, g_line_amt);   }
     | '$' '(' UNIT_NAME  ')'                        { }
     | '$' '{' UNIT_NAME  '}'                        { }
     | '$' '(' PATH ')'                              { ErrorMsg("path var",(const char*)$3, g_line_amt);     }
     | '$' '{' PATH '}'                              { ErrorMsg("path var",(const char*)$3, g_line_amt);     }
     | '$' '(' NAME_OF_FILE ')'                      { ErrorMsg("filename var",(const char*)$3, g_line_amt); }
     | '$' '{' NAME_OF_FILE '}'                      { ErrorMsg("filename var",(const char*)$3, g_line_amt); }
-    | '$' '(' CHARS ')'                            { ErrorMsg("string var",(const char*)$3, g_line_amt);   }
-    | '$' '{' CHARS '}'                            { ErrorMsg("string var",(const char*)$3, g_line_amt);   }
+    | '$' '(' CHARS ')'                             { ErrorMsg("string var",(const char*)$3, g_line_amt);   }
+    | '$' '{' CHARS '}'                             { ErrorMsg("string var",(const char*)$3, g_line_amt);   }
     | '$' '(' variable_unit ')'
     | '$' '{' variable_unit '}'
     | '$' '$' '(' variable_units ')'                               //переменные записываются в скрипте как `$(foo)' или `${foo}'
@@ -200,14 +200,14 @@ target_name: UNIT_NAME  { }
 //правила для зависимостей(пререквизитов)//
 
 prerequisite:
-    | prerequisite_idents             { }
+    | prerequisite_units             { }
     ;
 
-prerequisite_idents: prerequisite_ident
-    | prerequisite_idents prerequisite_ident
+prerequisite_units: prerequisite_unit
+    | prerequisite_units prerequisite_unit
     ;
 
-prerequisite_ident: UNIT_NAME {}
+prerequisite_unit: UNIT_NAME {}
     | PATH
     | NAME_OF_FILE
     | FUNCTION

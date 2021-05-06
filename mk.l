@@ -5,12 +5,13 @@ extern unsigned int g_line_amt;
 extern int yyerror(const char *);
 unsigned int cont = 0;
 extern char* g_name_of_file;
-static void update_line();
-static void handle_function();
+static void UpdateLine();
+static void HandleFunction();
 %}
 
 DIGIT [0-9]
 UNIT_NAME [_a-zA-Z\-\+\@\\]
+
 RUN_CMD ^(\@[^\@]*\@)?\t\.\/[^\n]*          
 CMD_S ^(\@[^\@]*\@)?\t[^\n]*
 %%
@@ -18,30 +19,30 @@ CMD_S ^(\@[^\@]*\@)?\t[^\n]*
 
 {RUN_CMD}                        { return RUN_COMMAND;}
 {CMD_S}                          { return COMMAND;}
-{RUN_CMD}(\\\n[ \t]*[^\n]*)*     { update_line(); return RUN_COMMAND;}
-{CMD_S}(\\\n[ \t]*[^\n]*)*       { update_line(); return COMMAND;}
+{RUN_CMD}(\\\n[ \t]*[^\n]*)*     { UpdateLine(); return RUN_COMMAND;}
+{CMD_S}(\\\n[ \t]*[^\n]*)*       { UpdateLine(); return COMMAND;}
 
 "#"[^\n]*   {}
 
-","         { return ','; }           
-"?"         { return '?'; }
-"!"         { return '!'; }
-":"         { return ':'; }
-";"         { return ';'; }
+"("         { return '('; }
+")"         { return ')'; }
+"{"         { return '{'; }
+"$"         { return '$'; }
+"]"         { return ']'; }
+"["         { return '['; }
 "-"         { return '-'; }
 "+"         { return '+'; }
 "\""        { return '"'; }
 "|"         { return '|'; }
+";"         { return ';'; }
 "/"         { return '/'; }
 "&"         { return '&'; }
-"$"         { return '$'; }
-"]"         { return ']'; }
-"["         { return '['; }
-"("         { return '('; }
-")"         { return ')'; }
-"{"         { return '{'; }
-"}"         { return '}'; }
 "<"         { return '<'; }
+"}"         { return '}'; }
+","         { return ','; }           
+"?"         { return '?'; }
+"!"         { return '!'; }
+":"         { return ':'; }
 ">"         { return '>'; }
 "`"         { return '`'; }
 \'          { return '\''; }
@@ -60,71 +61,73 @@ CMD_S ^(\@[^\@]*\@)?\t[^\n]*
 ^"include"  { return INCLUDE;}
 <<EOF>>     { static int once = 0; return once++ ? 0 : EOL;}
   
+
 ".PHONY"|".SUFFIXES"|".DEFAULT"|".PRECIOUS"|".INTERMEDIATE"|".SECONDARY"|".DELETE_ON_ERROR"|".IGNORE"|".SILENT"|".EXPORT_ALL_VARIABLES"|".NOTPARALLEL"    { return SPECIAL; }
 
-$\("foreach"    { handle_function();return FUNCTION;}
-$\("subst"      { handle_function();return FUNCTION;}
-$\("patsubst"   { handle_function();return FUNCTION;}
-$\("findstring" { handle_function();return FUNCTION;}
-$\("filter-out" { handle_function();return FUNCTION;}
-$\("sort"       { handle_function();return FUNCTION;}
-$\("word"       { handle_function();return FUNCTION;}
-$\("wordlist"   { handle_function();return FUNCTION;}
-$\("firstword"  { handle_function();return FUNCTION;}
-$\("dir"        { handle_function();return FUNCTION;}
-$\("notdir"     { handle_function();return FUNCTION;}
-$\("suffix"     { handle_function();return FUNCTION;}
-$\("basename"   { handle_function();return FUNCTION;}
-$\("addsuffix"  { handle_function();return FUNCTION;}
-$\("addprefix"  { handle_function();return FUNCTION;}
-$\("strip"      { handle_function();return FUNCTION;}
-$\("join"       { handle_function();return FUNCTION;}
-$\("wildcard"   { handle_function();return FUNCTION;}
-$\("realpath"   { handle_function();return FUNCTION;}
-$\("abspath"    { handle_function();return FUNCTION;}
-$\("if"         { handle_function();return FUNCTION;}
-$\("or"         { handle_function();return FUNCTION;}
-$\("and"        { handle_function();return FUNCTION;}
-$\("file"       { handle_function();return FUNCTION;}
-$\("call"       { handle_function();return FUNCTION;}
-$\("value"      { handle_function();return FUNCTION;}
-$\("eval"       { handle_function();return FUNCTION;}
-$\("origin"     { handle_function();return FUNCTION;}
-$\("flavour"    { handle_function();return FUNCTION;}
-$\("error"      { handle_function();return ERROR;}
 
-^"%"({UNIT_NAME}|{DIGIT}|[\.]|[//])*                              { return TEMPLATE_TRGT;}
-^"."({UNIT_NAME}|{DIGIT})*"."({UNIT_NAME}|{DIGIT})+                  { return SFX_TRGT;}
+$\("abspath"    { HandleFunction();return FUNCTION;}
+$\("addsuffix"  { HandleFunction();return FUNCTION;}
+$\("addprefix"  { HandleFunction();return FUNCTION;}
+$\("and"        { HandleFunction();return FUNCTION;}
+$\("basename"   { HandleFunction();return FUNCTION;}
+$\("call"       { HandleFunction();return FUNCTION;}
+$\("dir"        { HandleFunction();return FUNCTION;}
+$\("eval"       { HandleFunction();return FUNCTION;}
+$\("error"      { HandleFunction();return ERROR;   }
+$\("file"       { HandleFunction();return FUNCTION;}
+$\("firstword"  { HandleFunction();return FUNCTION;}
+$\("findstring" { HandleFunction();return FUNCTION;}
+$\("foreach"    { HandleFunction();return FUNCTION;}
+$\("filter-out" { HandleFunction();return FUNCTION;}
+$\("flavour"    { HandleFunction();return FUNCTION;}
+$\("if"         { HandleFunction();return FUNCTION;}
+$\("join"       { HandleFunction();return FUNCTION;}
+$\("notdir"     { HandleFunction();return FUNCTION;}
+$\("or"         { HandleFunction();return FUNCTION;}
+$\("origin"     { HandleFunction();return FUNCTION;}
+$\("patsubst"   { HandleFunction();return FUNCTION;}
+$\("realpath"   { HandleFunction();return FUNCTION;}
+$\("sort"       { HandleFunction();return FUNCTION;}
+$\("strip"      { HandleFunction();return FUNCTION;}
+$\("suffix"     { HandleFunction();return FUNCTION;}
+$\("subst"      { HandleFunction();return FUNCTION;}
+$\("value"      { HandleFunction();return FUNCTION;}
+$\("wordlist"   { HandleFunction();return FUNCTION;}
+$\("wildcard"   { HandleFunction();return FUNCTION;}
+$\("word"       { HandleFunction();return FUNCTION;}
 
-
-\"[^\"]*\"                        { yylval.str = strdup(yytext); return CHARS; }
-\'[^\']*\'                        { yylval.str = strdup(yytext); return CHARS; }
-\`[^\`]*\`                        { return SHELL_COMMAND; }
-$\(shell[^\)]*\)                  { return SHELL_COMMAND; }
-
-"::="|"="                         { return VAR_DEFINITION; }
-[":"|"!"|"?"|"+"]"="              { return VAR_DEFINITION; }
-
-$("@"|"%"|"<"|"?"|"^"|"+"|"*")    { yylval.str = strdup(yytext);return VAR_AUT; }
+^"%"({UNIT_NAME}|{DIGIT}|[\.]|[//])*                                        { return TEMPLATE_TRGT;}
+^"."({UNIT_NAME}|{DIGIT})*"."({UNIT_NAME}|{DIGIT})+                         { return SFX_TRGT;}
 
 
+\"[^\"]*\"                                                                  { yylval.str = strdup(yytext); return CHARS; }
+\'[^\']*\'                                                                  { yylval.str = strdup(yytext); return CHARS; }
+\`[^\`]*\`                                                                  { return SHELL_COMMAND; }
+$\(shell[^\)]*\)                                                            { return SHELL_COMMAND; }
 
-\%({UNIT_NAME}|{DIGIT}|[\.])*            { return TEMPLATE;}
+"::="|"="                                                                   { return VAR_DEFINITION; }
+[":"|"!"|"?"|"+"]"="                                                        { return VAR_DEFINITION; }
 
-\\[\r]?\n[ \t]*  { ++g_line_amt;}
-
-({UNIT_NAME}|{DIGIT})+                   { yylval.str = strdup(yytext); return UNIT_NAME; }
+$("@"|"%"|"<"|"?"|"^"|"+"|"*")                                              { yylval.str = strdup(yytext);return VAR_AUT; }
 
 
-({UNIT_NAME}|{DIGIT}|[\.])+                 { yylval.str = strdup(yytext); return NAME_OF_FILE; }
-(\/|[\.\.]|[\.])?(({UNIT_NAME}|{DIGIT}|[\.]|[\.\.])+[\/]?)+([\/]|[\/\*])?  { yylval.str = strdup(yytext); return PATH; }
+
+\%({UNIT_NAME}|{DIGIT}|[\.])*                                               { return TEMPLATE;}
+
+\\[\r]?\n[ \t]*                                                             { ++g_line_amt;}
+
+({UNIT_NAME}|{DIGIT})+                                                      { yylval.str = strdup(yytext); return UNIT_NAME; }
+
+
+({UNIT_NAME}|{DIGIT}|[\.])+                                                 { yylval.str = strdup(yytext); return NAME_OF_FILE; }
+(\/|[\.\.]|[\.])?(({UNIT_NAME}|{DIGIT}|[\.]|[\.\.])+[\/]?)+([\/]|[\/\*])?   { yylval.str = strdup(yytext); return PATH; }
 
 [ \t\f\v\r]
-.          { printf("0x%x ",yytext[0]);yyerror("!syntax error"); exit(0); }
+.                                                                           { printf("0x%x ",yytext[0]);yyerror("!syntax error"); exit(0); }
 
 %%
 
-static void handle_function()
+static void HandleFunction()
 {
     int c = 0; 
     int sc_count = 1; 
@@ -133,13 +136,10 @@ static void handle_function()
     { 
         switch (c)
         {
-            
             case ')': 
             { 
                 if(--sc_count == 0) 
-                { 
                     return;
-                }
                 break;
             }
             case '(':
@@ -155,10 +155,7 @@ static void handle_function()
                     break;
                 }
                 else
-                {
-                    yyerror("!syntax function error");
-                }
-                
+                    yyerror("!syntax function error");                
             }
             default: prev = c; break;
         }
@@ -166,7 +163,7 @@ static void handle_function()
 }
 
 
-static void update_line()
+static void UpdateLine()
 {
     char str[256];
     memset(str,0,256);
