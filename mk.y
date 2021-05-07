@@ -54,14 +54,17 @@ void ErrorMsg(const char* error_type, const char* error_cause, int line_number);
 
 %start input
 
+
+
 %%
+
 input: 
       line
     | input line                    //стартовая строка
     ;
 
 line: EOL                          
-                                    //отлов возможных ошибок
+    //отлов возможных ошибок
     | unit EOL                     { ErrorMsg("alone unit","", g_line_amt-1);}
     | CHARS EOL                    { ErrorMsg("alone unit","", g_line_amt-1);}
     | SHELL_COMMAND EOL            { ErrorMsg("alone unit","", g_line_amt-1);}
@@ -77,21 +80,21 @@ line: EOL
 
 
 variable: 
-      var_name VAR_DEFINITION EOL                   //объявление переменной: имя = последовательность_символов
-    | var_name VAR_DEFINITION variable_units EOL   //для экспорта переменных верхнего уровня на нижний
+      variable_name VAR_DEFINITION EOL                   //объявление переменной: имя = последовательность_символов
+    | variable_name VAR_DEFINITION variable_units EOL   //для экспорта переменных верхнего уровня на нижний
     | EXPORT UNIT_NAME EOL
     | EXPORT variable
     ;
 
-var_name: 
+variable_name: 
       UNIT_NAME                    
-    | VAR_AUT                      { ErrorMsg("auto var",(const char*)$1, g_line_amt);}
-    | PATH	                       { ErrorMsg("path var",(const char*)$1, g_line_amt);}
-    | NAME_OF_FILE                 { ErrorMsg("filename var",(const char*)$1, g_line_amt);}
+    | VAR_AUT                                         { ErrorMsg("auto var",(const char*)$1, g_line_amt);}
+    | PATH	                                          { ErrorMsg("path var",(const char*)$1, g_line_amt);}
+    | NAME_OF_FILE                                    { ErrorMsg("filename var",(const char*)$1, g_line_amt);}
     ;
 
 variable_units: 
-      UNIT_NAME           //может быть как один объект, так и лист объектов
+      UNIT_NAME                                       //может быть как один объект, так и лист объектов
     | CHARS
     | PATH
     | NAME_OF_FILE
@@ -112,8 +115,8 @@ variable_unit:
     | FUNCTION
     | SHELL_COMMAND
     | variable_unit_spec  
-    | var_value
-    | VAR_AUT                      { ErrorMsg("auto var",(const char*)$1, g_line_amt);}
+    | variable_value
+    | VAR_AUT                                         { ErrorMsg("auto var",(const char*)$1, g_line_amt);}
     ;
 
 variable_unit_spec: 
@@ -131,23 +134,23 @@ variable_unit_spec:
     ;
 
 //ссылка на переменную
-var_value: 
+variable_value: 
       '$' UNIT_NAME                                        
     | '$' '$' UNIT_NAME                             
+    | '$' CHARS                                     { ErrorMsg("string var",(const char*)$2, g_line_amt);   }
     | '$' PATH                                      { ErrorMsg("path var",(const char*)$2, g_line_amt);     }
     | '$' '$' PATH                                  { ErrorMsg("path var",(const char*)$3, g_line_amt);     }
-    | '$' NAME_OF_FILE                              { ErrorMsg("filename var",(const char*)$2, g_line_amt); }
-    | '$' '$' NAME_OF_FILE                          { ErrorMsg("filename var",(const char*)$3, g_line_amt); }
-    | '$' CHARS                                     { ErrorMsg("string var",(const char*)$2, g_line_amt);   }
     | '$' '$' CHARS                                 { ErrorMsg("string var",(const char*)$3, g_line_amt);   }
-    | '$' '(' UNIT_NAME  ')'                        
-    | '$' '{' UNIT_NAME  '}'                        
     | '$' '(' PATH ')'                              { ErrorMsg("path var",(const char*)$3, g_line_amt);     }
     | '$' '{' PATH '}'                              { ErrorMsg("path var",(const char*)$3, g_line_amt);     }
-    | '$' '(' NAME_OF_FILE ')'                      { ErrorMsg("filename var",(const char*)$3, g_line_amt); }
-    | '$' '{' NAME_OF_FILE '}'                      { ErrorMsg("filename var",(const char*)$3, g_line_amt); }
     | '$' '(' CHARS ')'                             { ErrorMsg("string var",(const char*)$3, g_line_amt);   }
     | '$' '{' CHARS '}'                             { ErrorMsg("string var",(const char*)$3, g_line_amt);   }
+    | '$' NAME_OF_FILE                              { ErrorMsg("filename var",(const char*)$2, g_line_amt); }
+    | '$' '$' NAME_OF_FILE                          { ErrorMsg("filename var",(const char*)$3, g_line_amt); }
+    | '$' '(' UNIT_NAME  ')'                        
+    | '$' '{' UNIT_NAME  '}'                        
+    | '$' '{' NAME_OF_FILE '}'                      { ErrorMsg("filename var",(const char*)$3, g_line_amt); }
+    | '$' '(' NAME_OF_FILE ')'                      { ErrorMsg("filename var",(const char*)$3, g_line_amt); }
     | '$' '(' variable_unit ')'
     | '$' '{' variable_unit '}'
     | '$' '$' '(' variable_units ')'                               //переменные записываются в скрипте как `$(foo)' или `${foo}'
@@ -205,12 +208,12 @@ target_name:
     | NAME_OF_FILE
     | TEMPLATE_TRGT
     | template
-    | VAR_AUT  { ErrorMsg("auto var",(const char*)$1, g_line_amt);}
-    | var_value
+    | VAR_AUT                                       { ErrorMsg("auto var",(const char*)$1, g_line_amt);}
+    | variable_value
     ;
 
 
-//правила для зависимостей(пререквизитов)//
+//правила для пререквизитов//
 
 prerequisite:
     | prerequisite_units             
@@ -222,13 +225,13 @@ prerequisite_units:
     ;
 
 prerequisite_unit: 
-      UNIT_NAME {}
+      UNIT_NAME 
     | PATH
     | NAME_OF_FILE
     | FUNCTION
     | template
-    | VAR_AUT       { ErrorMsg("auto var", (const char*)$1, g_line_amt);}
-    | var_value
+    | VAR_AUT                                       { ErrorMsg("auto var", (const char*)$1, g_line_amt);}
+    | variable_value
     ;
 
 template: 
@@ -237,7 +240,7 @@ template:
     ;
 
 
-//правило для команд, которые будут передаваться в bash
+//правило для команд, которые идут после пререквизитов
 
 command_seq: 
       cmd EOL     
@@ -287,19 +290,18 @@ condition:
     | if '(' ',' ')' EOL
     | if CHARS CHARS EOL   
     | ifdef unit EOL 
-    | ELSE		     { if(!g_cond_amt) yyerror("else without ifeq/ifdef statement");}
-    | ENDIF          { if(!g_cond_amt) yyerror("endif without ifeq/ifdef statement"); else --g_cond_amt;}
+    | ELSE		                                { if(!g_cond_amt) yyerror("else without ifeq/ifdef statement");}
+    | ENDIF                                     { if(!g_cond_amt) yyerror("endif without ifeq/ifdef statement"); else --g_cond_amt;}
     ;
 
-
 if: 
-      IFEQ      { ++g_cond_amt;}
-    | IFNEQ     { ++g_cond_amt;}
+      IFEQ                                      { ++g_cond_amt;}
+    | IFNEQ                                     { ++g_cond_amt;}
     ;
 
 ifdef: 
-      IFDEF     { ++g_cond_amt; } 
-    | IFNDEF    { ++g_cond_amt; }
+      IFDEF                                     { ++g_cond_amt; } 
+    | IFNDEF                                    { ++g_cond_amt; }
     ;
 
 cond: 
@@ -321,15 +323,15 @@ def_cmds:
 
 def_cmd: 
       def_cmd_spec 
-    | UNIT_NAME
-    | PATH
-    | NAME_OF_FILE
-    | CHARS
-    | SHELL_COMMAND
     | VAR_DEFINITION
+    | SHELL_COMMAND
+    | NAME_OF_FILE
+    | variable_value
+    | UNIT_NAME
     | FUNCTION
-    | var_value
     | VAR_AUT  
+    | PATH
+    | CHARS
     | EOL   
     ;
 
@@ -358,7 +360,7 @@ filenames:
       UNIT_NAME
     | PATH
     | NAME_OF_FILE
-    | var_value
+    | variable_value
     ;
 
 units: 
@@ -371,7 +373,7 @@ unit:
     | PATH
     | NAME_OF_FILE
     | VAR_AUT
-    | var_value
+    | variable_value
     ;
 
 %%
